@@ -1,0 +1,14 @@
+# METAFS AS CACHE LAYER
+
+The MetaFS can be used as a cache layer
+to buffer requests from another pyfilesystem
+via an ADAPTOR FILESYSTEM.
+
+
+ADAPTOR FILESYSTEM
+
+A filesystem method, such as `readtext()` or `getinfo()` will first try the MetaFS layer. If no data exists, then try the TARGET FILESYSTEM. The result is written into the MetaFS layer as a buffer for the next time the method is called.
+
+`writetext()` and `setinfo()` both update the MetaFS, which causes 'delta' state to be written to a queue.
+
+A `flushall()` method will read the delta queue and push changes to the TARGET FILESYSTEM.

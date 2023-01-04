@@ -1,0 +1,118 @@
+# METAFS DATABASE DESIGN
+
+
+
+# OBFUSCATED EXAMPLE
+
+'laydbugfs:USERPUBLICID:HIDDEN-HOMENAME' : [
+  'fs:12344',
+  'fs:22344',
+]
+
+'fs:USERPUBLICID:HIDDEN-HOMENAME:HIDDEN-FS-URL' : 'fs:12344'
+
+'fs:12344': {
+  root: 'ino:12344',
+  urn: 'fs:USERPUBLICID:HIDDEN-HOMENAME:HIDDEN-FS-URL',
+  user: USERPUBLICID,
+  url: HIDDEN-FS-URL,
+}
+
+'ino:12344': {
+  info: HIDDEN-INFO,
+  dir: [ 'ino:12345', 'ino:13345' ],
+  par: 'fs:12344',
+  hash: HIDDEN-HASH,
+  data: HIDDEN-DATA
+}
+
+
+# UN-OBFUSCATED EXAMPLE
+
+'laydbugfs:raygan@raygan.com:raygan-home': [
+  'fs:12344',
+  'fs:22344',
+]
+
+'fs:raygan@raygan.com:raygan-home:file://mbp-linux.local/home/raygan': 'fs:12344'
+'fs:raygan@raygan.com:raygan-home:file://dboyhiena10.local/home/raygan': 'fs:22344'
+
+'fs:12344': {
+  root: 'ino:12344',
+  urn: 'fs:raygan@raygan.com:raygan-home:file://mbp-linux.local/home/raygan',
+  user: 'raygan@raygan.com',
+  url: 'file://mbp-linux.local/home/raygan'
+}
+
+'fs:22344': {
+  root: 'ino:22344',
+  urn: 'fs:raygan@raygan.com:raygan-home:file://dboyhiena10.local/home/raygan',
+  user: 'raygan@raygan.com',
+  url: 'file://dboyhiena10.local/home/raygan'
+}
+
+
+
+'ino:12344': {
+  info: {'basic': {'name': '', 'is_dir': True}},
+  dir: [ 'ino:12345', 'ino:13345' ],
+  par: 'fs:12344'
+}
+
+'ino:12345': {
+  info: {'basic': {'name': 'Pictures', 'is_dir': True}},
+  dir: [ 'ino:12346', 'ino:12347', 'ino:12348' ],
+  par: 'ino:12344'
+}
+
+
+'delta:update:fs:12344': [
+  'ino:12345': { dir: [ 'ino:12348' ] },
+  'ino:12348': { data: 'data:12348' },
+  'ino:12346': { info: { 'basic': {'name': 'High_Sierra.jpg'}}},
+  'ino:12347': { hash: '12347deadbeef2' }
+]
+
+'delta:remove:fs:12344': [
+]
+
+
+'ino:12346': {
+  info: {'basic': {'name': 'High Sierra.jpg', 'is_dir': False}},
+  hash: '12346deadbeef',
+}
+
+'ino:12347': {
+  info: {'basic': {'name': 'Mojave Night.jpg', 'is_dir': False}},
+  hash: '12347deadbeef',
+}
+
+'ino:12348': {
+  info: {'basic': {'name': 'Mt Fuji.jpg', 'is_dir': False}},
+  hash: '12348deadbeef',
+  data: 'data:12348'
+}
+
+
+'data:12348': 'xx..'
+
+
+'ino:13345': {
+  info: {'basic': {'name': '@', 'is_dir': True}},
+  dir: 'dir:13345',
+}
+
+'dir:13345': [
+  'ino:13346'
+]
+
+'ino:13346': {
+  info: {'basic': {'name': 'etc', 'is_dir': True}}.
+  dir: 'dir:13347',
+}
+
+'dir:13345': [
+  'ino:13346'
+]
+
+

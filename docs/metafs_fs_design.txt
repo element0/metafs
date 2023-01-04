@@ -1,0 +1,29 @@
+# METAFS FS DESIGN
+
+
+STORAGE BACKING
+
+MetaFS data is stored in Redis.
+
+
+NETWORK SECURITY
+
+Data ingress/egress over http on private subnet.
+
+
+MULTI-TENANT PRIVACY
+
+The MetaFS pyfilesystem module is single tenant.
+
+The MetaFS Redis service is multi-tenant.
+
+
+DATA-KEY
+
+The MetaFS pyfilesystem is initialized with a DATA-KEY which will be used to encrypt the private data, such as filenames, filepaths, filesystem URL's, info datagrams and data blobs.
+
+
+CONFIG
+
+- Data-Key
+- Redis Address
