@@ -1,6 +1,7 @@
 import redis
 import json
 
+import fs.errors
 from fs.base import FS
 from fs.path import split as path_split
 from fs.info import Info
@@ -10,18 +11,17 @@ from dotenv import dotenv_values
 
 class MetaFS(FS):
 
-    def __init__(self, userhome_config_path, redis_config_path="config-redis.sh"):
+    def __init__(self,
+                 userhome_config_path,
+                 redis_config_path="config-redis.sh"):
         config = {
             **dotenv_values(redis_config_path),
             **dotenv_values(userhome_config_path)
         }
         fsurn = f'fs:{config["USERPUBLICID"]}:{config["USERHOMENAME"]}:{config["USERFSURL"]}'
 
-        print(f"MetaFS::__init__::fsurn: {fsurn}")
-        
         self.config = config
         self.fsurn = fsurn
-
         self.redis = redis.Redis(
                 config['REDIS_CONTAINER_HOST'],
                 config['REDIS_CONTAINER_PORT'],
@@ -49,14 +49,16 @@ class MetaFS(FS):
                     "url":config['USERFSURL']
                 })
             )
+
         fsrecord = json.loads(self.redis.get(self.fsnokey))
-        print(f'MetaFS::__init__::fsnokey: {self.fsnokey}')
-        print(f'MetaFS::__init__::<fs record>: {fsrecord}')
 
         self.rootinokey = fsrecord['root']
 
     def lookup(self, inokey, pathseg):
         recordstr = self.redis.get(inokey)
+        if not recordstr:
+            return None
+
         record = json.loads(recordstr)
         if "dir" in record:
             for entrykey in record["dir"]:
@@ -99,27 +101,52 @@ class MetaFS(FS):
     def makeinokey(self,num):
         return f'ino:{num}'
 
+
+    def getrecord(self, inokey):
+        record_str = self.redis.get(inokey)
+        if not record_str:
+            return None
+        return json.loads(record_str)
+
+    def setrecord(self, inokey, record):
+        if not record:
+            record_str = ""
+        else:
+            record_str = json.dumps(record)
+        self.redis.set(inokey,record_str)
+
+
+    # pyfilesystem required methods
+
     def getinfo(self, path, namespaces=None):
         target_inokey = self.pathwalk(path)
         if not target_inokey:
             return None
-
-        target_record_str = self.redis.get(target_inokey)
-        target_record = json.loads(target_record_str)
+        target_record = self.getrecord(target_inokey)
         if "info" in target_record:
             info_raw = target_record["info"]
             info = Info(info_raw)
             return info
-
         return None
 
     def listdir(self, path):
-        pass
+        directory_inokey = self.pathwalk(path)
+        directory_record = self.getrecord(directory_inokey)
+        if not "dir" in directory_record:
+            return None
+        directory_list = directory_record["dir"]
+        if len(directory_list) == 0:
+            return []
+
+        entries = [ json.loads(self.redis.get(inokey))["info"]["basic"]["name"]
+                    for inokey in directory_list ]
+        return entries
     
     def makedir(self, path, permissions=None, recreate=False):
-        pass
+        # currently ignoring 'permissions' and 'recreate'
+        return self.makeinode(path,is_dir=True)
 
-    def makeinode(self, path):
+    def makeinode(self, path, is_dir=False):
         existing_inokey = self.pathwalk(path)
         if existing_inokey:
             return existing_inokey
@@ -127,34 +154,80 @@ class MetaFS(FS):
         _dirname, _basename = path_split(path)
 
         parent_inokey = self.pathwalk(_dirname)
-        parent_record_str = self.redis.get(parent_inokey)
-        parent_record = json.loads(parent_record_str)
+        parent_record = self.getrecord(parent_inokey)
+        if not parent_record:
+            parent_record = dict()
         
         new_ino = self.getnextino()
         new_inokey = self.makeinokey(new_ino)
-        new_record = {"info":{"basic":{"name":_basename}}}
-        new_record_str = json.dumps(new_record)
+        new_record = {"info":{"basic":{"name":_basename,"is_dir":is_dir}},"linkcount":1}
+        if is_dir:
+            new_record["dir"] = []
        
         if "dir" not in parent_record:
             parent_record["dir"] = list()
 
         parent_record["dir"].append(new_inokey)
-        parent_record_str = json.dumps(parent_record)
-        
-        self.redis.set(new_inokey,new_record_str.encode())
-        self.redis.set(parent_inokey,parent_record_str.encode())
+        self.setrecord(parent_inokey,parent_record)
+        self.setrecord(new_inokey,new_record)
         
         return new_inokey
     
     def openbin(self, path, mode='r', buffering=-1, **options):
-        pass
+        # Not implemented.
+        raise fs.errors.ResourceNotFound
 
     def remove(self, path):
-        pass
+        _dirname, _basename = path_split(path)
+        parent_inokey = self.pathwalk(_dirname)
+        target_inokey = self.lookup(parent_inokey,_basename)
+
+        parent_record = self.getrecord(parent_inokey)
+        if not "dir" in parent_record:
+            return None
+        directory_list = parent_record["dir"]
+        directory_list.remove(target_inokey)
+        
+        target_record = self.getrecord(target_inokey)
+        if "linkcount" in target_record:
+            linkcount = target_record["linkcount"]
+            linkcount = linkcount - 1
+            if linkcount == 0:
+                self.redis.delete(target_inokey)
+            else:
+                target_record["linkcount"] = linkcount
+                self.setrecord(target_inokey,target_record)
+
+        self.setrecord(parent_inokey,parent_record)
+        return True
 
     def removedir(self, path):
-        pass
+        if path == "/" or path == "":
+            raise fs.errors.RemoveRootError()
 
-    def setinfo(self, path, info):
-        pass
+        directory_inokey = self.pathwalk(path)
+        if not directory_inokey:
+            raise fs.errors.ResourceNotFound()
 
+        directory_record = self.getrecord(directory_inokey)
+
+        if "dir" in directory_record:
+            if len(directory_record["dir"]) > 0:
+                raise fs.errors.DirectoryNotEmpty(path)
+
+        if not directory_record["info"]["basic"]["is_dir"]:
+            raise fs.errors.DirectoryExpected()
+
+        return self.remove(path)
+
+    def setinfo(self, path, info_raw):
+        target_inokey = self.pathwalk(path)
+        if not target_inokey:
+            raise fs.errors.ResourceNotFound(path)
+
+        target_record = self.getrecord(target_inokey)
+        if not target_record:
+            target_record = dict()
+
+        target_record["info"] = info_raw
+        self.setrecord(target_inokey,target_record)
