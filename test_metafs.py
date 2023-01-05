@@ -4,6 +4,8 @@ import fs.errors
 
 a = MetaFS('config-userhome-example.sh')
 
+a.tree()
+
 print(a.makeinode('/hello.txt'))
 print(a.getinfo('/hello.txt'))
 
@@ -17,7 +19,12 @@ print(a.makeinode('/yodel.txt'))
 a.tree()
 
 print(a.remove('/yodel.txt'))
-print(a.getinfo('/yodel.txt'))
+try:
+    print(a.getinfo('/yodel.txt'))
+except fs.errors.ResourceNotFound as error:
+    print(error)
+
+
 print(a.makedir('/hats'))
 a.tree()
 try:
@@ -31,3 +38,12 @@ raw_info = {"basic":{"name":"hello.txt","is_dir":False},"custom":"deadbeef"}
 
 print(a.setinfo('/hello.txt',raw_info))
 print(a.getinfo('/hello.txt').raw)
+
+i = a.getinfo('/')
+print(i.is_dir)
+print(a.makedir('/paints'))
+i = a.getinfo('/paints')
+print(i.is_dir)
+
+print(a.makedirs('/paints/primary',recreate=True))
+a.tree()

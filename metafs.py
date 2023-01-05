@@ -14,34 +14,35 @@ class MetaFS(FS):
     def __init__(self,
                  userhome_config_path,
                  redis_config_path="config-redis.sh"):
+        super().__init__()
         config = {
             **dotenv_values(redis_config_path),
             **dotenv_values(userhome_config_path)
         }
         fsurn = f'fs:{config["USERPUBLICID"]}:{config["USERHOMENAME"]}:{config["USERFSURL"]}'
+        print(f'fsurn: {fsurn}')
 
-        self.config = config
-        self.fsurn = fsurn
-        self.redis = redis.Redis(
+        r = redis.Redis(
                 config['REDIS_CONTAINER_HOST'],
                 config['REDIS_CONTAINER_PORT'],
                 db=0)
+        self.redis = r
 
-        if(self.redis.get('curino') == None):
-            self.redis.set('curino',1)
+        if(r.get('curino') == None):
+            r.set('curino',1)
+        print(f"curino: {r.get('curino')}")
 
-        self.fsnokey = self.redis.get(fsurn)
-        if(self.fsnokey == None):
+        fsnokey = r.get(fsurn)
+        print(f"fsnokey: {fsnokey}")
+        if(fsnokey == None):
             ino = self.getnextino()
             print(f"self.getnextino(): {ino}")
             fsnokey = self.makefsnokey(ino)
             inokey = self.makeinokey(ino)
 
-            self.fsnokey = fsnokey
+            r.set(fsurn,fsnokey)
 
-            self.redis.set(fsurn,fsnokey)
-
-            self.redis.set(fsnokey,
+            r.set(fsnokey,
                 json.dumps({
                     "root":inokey,
                     "urn":fsurn,
@@ -49,10 +50,24 @@ class MetaFS(FS):
                     "url":config['USERFSURL']
                 })
             )
+        
 
-        fsrecord = json.loads(self.redis.get(self.fsnokey))
+        self.config = config
+        self.fsurn = fsurn
+        self.fsnokey = fsnokey
 
-        self.rootinokey = fsrecord['root']
+        fsrecord = self.getrecord(fsnokey)
+        print(fsrecord)
+
+        rootinokey = fsrecord['root']
+        print(f"rootinokey:{rootinokey}")
+        self.rootinokey = rootinokey
+
+        rootino_record = self.getrecord(rootinokey)
+        if not rootino_record:
+            rootino_record = {"info":{"basic":{"name":"", "is_dir":True}}}
+            self.setrecord(rootinokey,rootino_record)
+
 
     def lookup(self, inokey, pathseg):
         recordstr = self.redis.get(inokey)
@@ -121,13 +136,13 @@ class MetaFS(FS):
     def getinfo(self, path, namespaces=None):
         target_inokey = self.pathwalk(path)
         if not target_inokey:
-            return None
+            raise fs.errors.ResourceNotFound(path)
         target_record = self.getrecord(target_inokey)
         if "info" in target_record:
             info_raw = target_record["info"]
             info = Info(info_raw)
             return info
-        return None
+        return fs.errors.ResourceNotFound(path)
 
     def listdir(self, path):
         directory_inokey = self.pathwalk(path)
