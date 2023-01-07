@@ -20,7 +20,6 @@ class MetaFS(FS):
             **dotenv_values(userhome_config_path)
         }
         fsurn = f'fs:{config["USERPUBLICID"]}:{config["USERHOMENAME"]}:{config["USERFSURL"]}'
-        print(f'fsurn: {fsurn}')
 
         r = redis.Redis(
                 config['REDIS_CONTAINER_HOST'],
@@ -30,13 +29,10 @@ class MetaFS(FS):
 
         if(r.get('curino') == None):
             r.set('curino',1)
-        print(f"curino: {r.get('curino')}")
 
         fsnokey = r.get(fsurn)
-        print(f"fsnokey: {fsnokey}")
         if(fsnokey == None):
             ino = self.getnextino()
-            print(f"self.getnextino(): {ino}")
             fsnokey = self.makefsnokey(ino)
             inokey = self.makeinokey(ino)
 
@@ -57,10 +53,8 @@ class MetaFS(FS):
         self.fsnokey = fsnokey
 
         fsrecord = self.getrecord(fsnokey)
-        print(fsrecord)
 
         rootinokey = fsrecord['root']
-        print(f"rootinokey:{rootinokey}")
         self.rootinokey = rootinokey
 
         rootino_record = self.getrecord(rootinokey)

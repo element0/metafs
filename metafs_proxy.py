@@ -23,12 +23,20 @@ class MetaFSProxy(FS):
         return i
 
     def setinfo(self, path, info_raw):
-        pass
+        self.targetfs.setinfo(path, info_raw)
+        _dirname, _basename = path_split(path)
+        self.metafs.makedirs(_dirname)
+        self.metafs.makeinode(path)
+        self.metafs.setinfo(path, info_raw) 
 
     def makedir(self, path, permissions=None, recreate=False):
-        pass
+        self.targetfs.makedir(path, permissions, recreate)
+        _dirname, _basename = path_split(path)
+        self.metafs.makedirs(_dirname)
+        self.metafs.makedir(path, permissions, recreate)
 
     def listdir(self, path):
+        
         pass
 
     def openbin(self, path, mode='r', buffering=-1, **options):
