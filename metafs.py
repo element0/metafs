@@ -22,7 +22,7 @@ class MetaFS(FS):
         fsurn = f'fs:{config["USERPUBLICID"]}:{config["USERHOMENAME"]}:{config["USERFSURL"]}'
 
         r = redis.Redis(
-                config['REDIS_CONTAINER_HOST'],
+                config['REDIS_CONTAINER_NAME'],
                 config['REDIS_CONTAINER_PORT'],
                 db=0)
         self.redis = r
