@@ -7,13 +7,13 @@ from fs.path import split as path_split
 from fs.info import Info
 from dotenv import dotenv_values
 
-
+REDIS_CONFIG_PATH="config-metafs.sh"
 
 class MetaFS(FS):
 
     def __init__(self,
                  userhome_config_path,
-                 redis_config_path="config-redis.sh"):
+                 redis_config_path=REDIS_CONFIG_PATH):
         super().__init__()
         config = {
             **dotenv_values(redis_config_path),
